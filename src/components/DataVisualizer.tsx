@@ -12,15 +12,22 @@ interface DataPoint {
   envAMass: number; envBMass: number;
 }
 
+interface EnvState {
+  mixture: MixtureItem[];
+  lifeform: string;
+  tempK: number;
+  pressure: number;
+}
+
 interface DataVisualizerProps {
-  envAMixture: MixtureItem[];
-  envBMixture: MixtureItem[];
+  envA: EnvState;
+  envB: EnvState;
   history: DataPoint[];
 }
 
 const COLORS = ['#45a29e', '#66fcf1', '#ff3333', '#ff8c00', '#f1c40f', '#9b59b6'];
 
-export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envAMixture, envBMixture, history }) => {
+export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envA, envB, history }) => {
   
   const getChartData = (mixture: MixtureItem[]) => {
     const total = mixture.reduce((sum, m) => sum + m.percentage, 0);
@@ -30,41 +37,107 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envAMixture, env
     }));
   };
 
-  const dataA = getChartData(envAMixture);
-  const dataB = getChartData(envBMixture);
+  const dataA = getChartData(envA.mixture);
+  const dataB = getChartData(envB.mixture);
+
+  const checkDanger = (env: EnvState) => {
+    const danger = { temp: false, pressure: false, gas: false };
+    const tC = env.tempK - 273.15;
+    const p = env.pressure;
+    const totalGas = env.mixture.reduce((s, m) => s + m.percentage, 0);
+
+    // HUMAN: 0C - 40C | 70kPa - 150kPa | O2 > 16%
+    if (env.lifeform === 'HUMAN') {
+      if (tC < 0 || tC > 40) danger.temp = true;
+      if (p < 70 || p > 150) danger.pressure = true;
+      const o2 = env.mixture.find(m => m.gasId === 'O2')?.percentage || 0;
+      if ((o2 / totalGas) < 0.16) danger.gas = true;
+    }
+    // XENOMORPH: -73C - -23C | 200kPa - 500kPa | NH3 > 20%
+    if (env.lifeform === 'XENOMORPH') {
+      if (tC < -73 || tC > -23) danger.temp = true;
+      if (p < 200 || p > 500) danger.pressure = true;
+      const nh3 = env.mixture.find(m => m.gasId === 'NH3')?.percentage || 0;
+      if ((nh3 / totalGas) < 0.20) danger.gas = true;
+    }
+    // SILICATE: 226C - 526C | 1000kPa - 5000kPa | CO2 > 50%
+    if (env.lifeform === 'SILICATE') {
+      if (tC < 226 || tC > 526) danger.temp = true;
+      if (p < 1000 || p > 5000) danger.pressure = true;
+      const co2 = env.mixture.find(m => m.gasId === 'CO2')?.percentage || 0;
+      if ((co2 / totalGas) < 0.50) danger.gas = true;
+    }
+    
+    return danger;
+  };
+
+  const dangerA = checkDanger(envA);
+  const dangerB = checkDanger(envB);
+
+  const dangerStyle = { 
+    border: '1px solid var(--neon-red)', 
+    borderRadius: '4px',
+    animation: 'pulseRed 1s infinite alternate',
+    boxShadow: '0 0 10px rgba(255, 0, 0, 0.3)'
+  };
+  
+  const baseBox = { height: '140px', display: 'flex', flexDirection: 'column', background: 'rgba(0,0,0,0.2)', padding: '5px', borderRadius: '4px' } as React.CSSProperties;
 
   return (
     <div className="panel flex-col gap-2" style={{ padding: '10px 15px' }}>
-      <h2 className="title-glow" style={{ color: '#fff', fontSize: '1.1rem', margin: 0, paddingBottom: '5px' }}>Thermodynamic Analytics Array</h2>
+      <style>
+        {`
+          @keyframes pulseRed {
+            from { box-shadow: 0 0 5px rgba(255, 0, 0, 0.2); border-color: #550000; }
+            to { box-shadow: 0 0 20px rgba(255, 0, 0, 0.8); border-color: #ff0000; }
+          }
+        `}
+      </style>
+      <h2 className="title-glow" style={{ color: '#fff', fontSize: '1.1rem', margin: 0, paddingBottom: '0' }}>Simulation Output Array</h2>
       
       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(3, 1fr)', gap: '15px' }}>
         
         {/* Module 1: Atmospheres (Split Pie Charts) */}
-        <div style={{ height: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#ccc', margin: 0, marginBottom: '5px' }}>Atmospheric Composition</h3>
+        <div style={{ ...baseBox }}>
+          <h3 style={{ fontSize: '0.8rem', color: '#ccc', margin: 0, marginBottom: '5px', textAlign: 'center' }}>Atmospheric Composition</h3>
           <div style={{ display: 'flex', width: '100%', height: '100%' }}>
-            <ResponsiveContainer width="50%" height="100%">
-              <PieChart>
-                <Pie data={dataA} cx="50%" cy="50%" innerRadius={25} outerRadius={45} dataKey="value" stroke="none">
-                  {dataA.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(value: any) => `${Number(value).toFixed(1)}%`} contentStyle={{background: '#111', border: '1px solid #444', fontSize: '0.7rem', padding: '5px'}} />
-              </PieChart>
-            </ResponsiveContainer>
-            <ResponsiveContainer width="50%" height="100%">
-              <PieChart>
-                <Pie data={dataB} cx="50%" cy="50%" innerRadius={25} outerRadius={45} dataKey="value" stroke="none">
-                  {dataB.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />)}
-                </Pie>
-                <Tooltip formatter={(value: any) => `${Number(value).toFixed(1)}%`} contentStyle={{background: '#111', border: '1px solid #444', fontSize: '0.7rem', padding: '5px'}} />
-              </PieChart>
-            </ResponsiveContainer>
+            {/* Env A Box */}
+            <div style={{ flex: 1, ...(dangerA.gas ? dangerStyle : {}) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={dataA} cx="50%" cy="50%" innerRadius={22} outerRadius={40} dataKey="value" stroke="none">
+                    {dataA.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => `${Number(value).toFixed(1)}%`} contentStyle={{background: '#111', border: '1px solid #444', fontSize: '0.7rem', padding: '5px'}} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ fontSize: '0.6rem', textAlign: 'center', color: dangerA.gas ? 'var(--neon-red)' : '#888' }}>
+                {dangerA.gas ? '⚠ TOXIC/ASPHYXIATION' : 'Env A'}
+              </div>
+            </div>
+
+            {/* Env B Box */}
+            <div style={{ flex: 1, ...(dangerB.gas ? dangerStyle : {}) }}>
+              <ResponsiveContainer width="100%" height="100%">
+                <PieChart>
+                  <Pie data={dataB} cx="50%" cy="50%" innerRadius={22} outerRadius={40} dataKey="value" stroke="none">
+                    {dataB.map((_, index) => <Cell key={`cell-${index}`} fill={COLORS[(index + 2) % COLORS.length]} />)}
+                  </Pie>
+                  <Tooltip formatter={(value: any) => `${Number(value).toFixed(1)}%`} contentStyle={{background: '#111', border: '1px solid #444', fontSize: '0.7rem', padding: '5px'}} />
+                </PieChart>
+              </ResponsiveContainer>
+              <div style={{ fontSize: '0.6rem', textAlign: 'center', color: dangerB.gas ? 'var(--neon-red)' : '#888' }}>
+                {dangerB.gas ? '⚠ TOXIC/ASPHYXIATION' : 'Env B'}
+              </div>
+            </div>
           </div>
         </div>
 
         {/* Module 2: Pressure History */}
-        <div style={{ height: '140px', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#ccc', textAlign: 'center', margin: 0, marginBottom: '5px' }}>Pressure History (kPa)</h3>
+        <div style={{ ...baseBox, ...((dangerA.pressure || dangerB.pressure) ? dangerStyle : {}) }}>
+          <h3 style={{ fontSize: '0.8rem', color: (dangerA.pressure || dangerB.pressure) ? 'var(--neon-red)' : '#ccc', textAlign: 'center', margin: 0, marginBottom: '5px' }}>
+            Pressure History (kPa) {(dangerA.pressure || dangerB.pressure) && '⚠ LETHAL CRUSH/VACUUM'}
+          </h3>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={history} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -78,8 +151,10 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envAMixture, env
         </div>
 
         {/* Module 3: Temperature History */}
-        <div style={{ height: '140px', display: 'flex', flexDirection: 'column' }}>
-          <h3 style={{ fontSize: '0.8rem', color: '#ccc', textAlign: 'center', margin: 0, marginBottom: '5px' }}>Temperature History (°C)</h3>
+        <div style={{ ...baseBox, ...((dangerA.temp || dangerB.temp) ? dangerStyle : {}) }}>
+          <h3 style={{ fontSize: '0.8rem', color: (dangerA.temp || dangerB.temp) ? 'var(--neon-red)' : '#ccc', textAlign: 'center', margin: 0, marginBottom: '5px' }}>
+            Temperature History (°C) {(dangerA.temp || dangerB.temp) && '⚠ LETHAL THERMAL ZONE'}
+          </h3>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={history} margin={{ top: 0, right: 5, left: -20, bottom: 0 }}>
               <CartesianGrid strokeDasharray="3 3" stroke="#222" />
@@ -93,7 +168,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envAMixture, env
         </div>
 
         {/* Module 4: Total Gas Mass */}
-        <div style={{ height: '140px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ ...baseBox }}>
           <h3 style={{ fontSize: '0.8rem', color: '#ccc', textAlign: 'center', margin: 0, marginBottom: '5px' }}>Total Gas Mass (kg)</h3>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={history} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -114,7 +189,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envAMixture, env
         </div>
 
         {/* Module 5: Atmospheric Density */}
-        <div style={{ height: '140px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ ...baseBox }}>
           <h3 style={{ fontSize: '0.8rem', color: '#ccc', textAlign: 'center', margin: 0, marginBottom: '5px' }}>Atmospheric Density (kg/m³)</h3>
           <ResponsiveContainer width="100%" height="100%">
             <LineChart data={history} margin={{ top: 0, right: 0, left: -20, bottom: 0 }}>
@@ -129,7 +204,7 @@ export const DataVisualizer: React.FC<DataVisualizerProps> = ({ envAMixture, env
         </div>
 
         {/* Module 6: Fatigue Accumulation */}
-        <div style={{ height: '140px', display: 'flex', flexDirection: 'column' }}>
+        <div style={{ ...baseBox }}>
           <h3 style={{ fontSize: '0.8rem', color: 'var(--neon-red)', textAlign: 'center', margin: 0, marginBottom: '5px', textShadow: '0 0 5px var(--neon-red)' }}>Structural Fatigue (%)</h3>
           <ResponsiveContainer width="100%" height="100%">
             <AreaChart data={history} margin={{ top: 0, right: 5, left: -20, bottom: 0 }}>

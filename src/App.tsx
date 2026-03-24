@@ -247,6 +247,9 @@ function App() {
         </div>
       </header>
 
+      {/* TOP ANALYTICS: Data Visualizer Array */}
+      <DataVisualizer envA={envA} envB={envB} history={history} />
+
       {/* COMPACT UI: 3-Column Layout */}
       <div style={{ display: 'grid', gridTemplateColumns: 'minmax(0, 1fr) minmax(0, 1fr) minmax(0, 1fr)', gap: '15px' }}>
         <div style={{ display: 'flex', flexDirection: 'column' }}>
@@ -286,9 +289,6 @@ function App() {
           />
         </div>
       </div>
-
-      {/* COMPACT UI: Data Visualizer Array */}
-      <DataVisualizer envAMixture={envA.mixture} envBMixture={envB.mixture} history={history} />
 
       {isBreached && <BreachAlert onReset={resetSimulation} />}
     </div>
