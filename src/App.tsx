@@ -45,6 +45,7 @@ function App() {
   });
 
   const [isBreached, setIsBreached] = useState(false);
+  const [isRunning, setIsRunning] = useState(false);
   const [fatigue, setFatigue] = useState(0); // 0 to 100%
   
   // Extended history state for charts
@@ -121,7 +122,7 @@ function App() {
   const maxForce = (barrier.yieldStrength * area) * thicknessMultiplier * shapeMultiplier;
 
   useEffect(() => {
-    if (isBreached) return; 
+    if (isBreached || !isRunning) return; 
     const interval = setInterval(() => {
       setTimeTick(t => t + 1);
       setEnvA(prev => applyMetabolism(prev));
@@ -147,7 +148,7 @@ function App() {
 
   // History updater
   useEffect(() => {
-    if (isBreached) return;
+    if (isBreached || !isRunning) return;
     
     const dA = (envA.pressure * 1000 * (calcAverageMass(envA.mixture) / 1000)) / (R * envA.tempK);
     const dB = (envB.pressure * 1000 * (calcAverageMass(envB.mixture) / 1000)) / (R * envB.tempK);
@@ -189,11 +190,13 @@ function App() {
   useEffect(() => {
     if ((force > maxForce || fatigue >= 100) && !isBreached) {
       setIsBreached(true);
+      setIsRunning(false);
     }
   }, [force, maxForce, fatigue, isBreached]);
 
   const resetSimulation = () => {
     setIsBreached(false);
+    setIsRunning(false);
     setHistory([]);
     setTimeTick(0);
     setFatigue(0);
@@ -218,7 +221,30 @@ function App() {
         <h1 style={{ fontFamily: 'var(--font-data)', color: 'var(--neon-cyan)', fontSize: '2rem', letterSpacing: '4px', textShadow: 'var(--glow-cyan)', margin: 0 }}>
           DUAL-ENVIRONMENT CONTROL DASHBOARD
         </h1>
-        <p style={{ color: '#888', margin: '5px 0' }}>SYSTEM STATUS: {isBreached ? <span style={{ color: 'var(--neon-red)' }}>COMPROMISED</span> : <span style={{ color: 'var(--neon-blue)' }}>NOMINAL</span>}</p>
+        <div style={{ display: 'flex', justifyContent: 'center', alignItems: 'center', gap: '20px', marginTop: '10px' }}>
+          <p style={{ color: '#888', margin: 0 }}>SYSTEM STATUS: {isBreached ? <span style={{ color: 'var(--neon-red)' }}>COMPROMISED</span> : <span style={{ color: 'var(--neon-blue)' }}>NOMINAL</span>}</p>
+          <button 
+             onClick={() => setIsRunning(!isRunning)}
+             disabled={isBreached}
+             style={{
+               background: isBreached ? '#333' : (isRunning ? 'var(--neon-orange)' : 'var(--neon-cyan)'),
+               color: '#000', border: 'none', padding: '5px 20px', borderRadius: '4px',
+               cursor: isBreached ? 'not-allowed' : 'pointer', fontWeight: 'bold', fontFamily: 'var(--font-data)',
+               letterSpacing: '1px'
+             }}
+          >
+             {isRunning ? '⏸ PAUSE SIMULATION' : '▶ START SIMULATION'}
+          </button>
+          <button 
+             onClick={resetSimulation}
+             style={{
+               background: '#222', color: '#fff', border: '1px solid #555', padding: '5px 15px', borderRadius: '4px',
+               cursor: 'pointer', fontFamily: 'var(--font-data)'
+             }}
+          >
+             🔄 RESET DATA
+          </button>
+        </div>
       </header>
 
       {/* COMPACT UI: 3-Column Layout */}
